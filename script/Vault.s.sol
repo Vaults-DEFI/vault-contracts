@@ -9,7 +9,7 @@ contract VaultScript is Script {
     function setUp() public {}
 
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("PVT_KEY");
         address assetAddress = vm.envAddress("ASSET_ADDRESS");
         uint256 entryBasisPoints = vm.envUint("ENTRY_BASIS_POINTS");
         uint256 exitBasisPoints = vm.envUint("EXIT_BASIS_POINTS");
