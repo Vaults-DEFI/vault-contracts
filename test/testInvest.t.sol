@@ -121,7 +121,9 @@ contract AaveInteractionTest is Test {
         // console.log("Withdrew %s USDC from Aave", aTokenBalance);
 
         uint256 userBalance3 = usdc.balanceOf(USER);
+        uint256 contractBalance = usdc.balanceOf(address(aaveInteraction));
         console.log("User's USDC balance after withdraw: %s", userBalance3);
+        console.log("contract's Balance USDC  withdraw: %s", contractBalance);
         // Stop impersonation
 
         vm.stopPrank();

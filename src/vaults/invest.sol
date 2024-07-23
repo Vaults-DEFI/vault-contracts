@@ -35,7 +35,7 @@ contract AaveInteraction {
             uint256 healthFactor
         )
     {
-        return lendingPool.getUserAccountData(msg.sender);
+        return lendingPool.getUserAccountData(address(this));
     }
 
     function getUserDeposit(
