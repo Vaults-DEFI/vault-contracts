@@ -10,13 +10,13 @@ contract VaultScript is Script {
 
     address PROVIDER_ADDRESS = vm.envAddress("PROVIDER_ADDRESS");
     address USDC = vm.envAddress("ASSET_ADDRESS");
-    uint256 USER = vm.envUint("PVT_KEY");
+    // uint256 USER = vm.envUint("PVT_KEY");
     address USER_ADDRESS = vm.envAddress("ANVIL");
 
     IERC20 usdc;
 
     function run() external {
-        vm.startBroadcast(USER);
+        vm.startBroadcast();
 
         // Deploy the contract
         AaveInteraction aaveInteraction = new AaveInteraction(PROVIDER_ADDRESS);
