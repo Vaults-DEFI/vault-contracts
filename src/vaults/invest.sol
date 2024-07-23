@@ -50,11 +50,6 @@ contract AaveInteraction {
         uint256 _amount,
         address to
     ) external returns (uint256) {
-        // uint256 aTokenBalance = IERC20(getATokenAddress(_asset)).balanceOf(
-        //     msg.sender
-        // );
-        // require(aTokenBalance >= _amount, "Not enough aTokens");
-
         IERC20(getATokenAddress(_asset)).approve(address(lendingPool), _amount);
         return lendingPool.withdraw(_asset, _amount, to);
     }

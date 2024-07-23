@@ -1,5 +1,7 @@
 To get the deployed addresses of AAVE: https://docs.aave.com/developers/deployed-contracts/deployed-contracts
 
+V3 ADDRESSES: https://docs.aave.com/developers/deployed-contracts/v3-mainnet
+
 ```shell
 cast rpc anvil_impersonateAccount $PAISA_WALA
 ```
@@ -17,5 +19,5 @@ forge script script/supplyScript.s.sol --rpc-url $RPC_URL
 ```
 
 ```shell
-forge test --rpc-url $RPC_URL --vvvv
+forge test --rpc-url $RPC_URL -vv
 ```
