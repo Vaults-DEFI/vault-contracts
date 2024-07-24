@@ -19,5 +19,9 @@ forge script script/supplyScript.s.sol --rpc-url $RPC_URL
 ```
 
 ```shell
+forge script script/deployInvest.s.sol --rpc-url $RPC_URL --broadcast --private-key $PVT_KEY
+```
+
+```shell
 forge test --rpc-url $RPC_URL -vv
 ```

@@ -59,15 +59,10 @@ contract AaveInteractionTest is Test {
             0,
             "USER dont hold the underlying token"
         );
-        // uint256 userBalance = token.balanceOf(USER);
-        // console.log("User's TOKEN balance beforw=e: %s", userBalance);
 
         // Approve and supply TOKEN
         token.approve(address(aaveInteraction), amount);
         console.log("Approved %s TOKEN for AaveInteraction contract", amount);
-
-        // uint256 allowance = token.allowance(USER, address(aaveInteraction));
-        // console.log("TOKEN allowance for AaveInteraction: %s", allowance);
 
         assertGe(
             token.allowance(USER, address(aaveInteraction)),
@@ -79,8 +74,8 @@ contract AaveInteractionTest is Test {
         aaveInteraction.supply(TOKEN, amount);
         console.log("Supplied %s TOKEN to Aave", amount);
 
-        uint256 userBalance2 = token.balanceOf(USER);
-        console.log("User's TOKEN balance after supply: %s", userBalance2);
+        // uint256 userBalance2 = token.balanceOf(USER);
+        // console.log("User's TOKEN balance after supply: %s", userBalance2);
 
         (
             uint256 totalCollateralBase,
@@ -102,83 +97,34 @@ contract AaveInteractionTest is Test {
         console.log("LTV: %s", ltv);
         console.log("Health Factor: %s", healthFactor);
 
-        aaveInteraction.withdraw(TOKEN, 100000000, address(aaveInteraction));
-        // console.log("Withdrew %s TOKEN from Aave", aTokenBalance);
+        assertGt(totalCollateralBase, 0, "No supply given");
+        assertEq(
+            atoken.balanceOf(address(aaveInteraction)),
+            amount,
+            "A token should be received"
+        );
 
-        uint256 userBalance3 = token.balanceOf(USER);
-        uint256 contractBalance = token.balanceOf(address(aaveInteraction));
-        console.log("User's TOKEN balance after withdraw: %s", userBalance3);
-        console.log("contract's Balance TOKEN  withdraw: %s", contractBalance);
         // Stop impersonation
-
         vm.stopPrank();
         console.log("Stopped impersonating user: %s", USER);
-
-        // Add assertions to verify the result
-
-        // Example assertion (uncomment and modify as needed)
-        // assertEq(poolBalance, amount);
     }
 
     function testSupplyAndWithdraw() public {
         console.log("== Starting testSupplyAndWithdraw ==");
+        testSupply();
         // Impersonate the user
         vm.startPrank(USER);
         console.log("Impersonated user: %s", USER);
 
-        // Check user's TOKEN balance
-        uint256 userBalance = token.balanceOf(USER);
-        console.log("User's TOKEN balance beforw=e: %s", userBalance);
+        console.log("== Starting testwithdraw ==");
 
-        // Approve and supply TOKEN
-        token.approve(address(aaveInteraction), amount);
-        console.log("Approved %s TOKEN for AaveInteraction contract", amount);
-
-        uint256 allowance = token.allowance(USER, address(aaveInteraction));
-        console.log("TOKEN allowance for AaveInteraction: %s", allowance);
-        require(allowance >= amount, "Allowance is not enough");
-
-        aaveInteraction.supply(TOKEN, amount);
-        console.log("Supplied %s TOKEN to Aave", amount);
-
-        uint256 userBalance2 = token.balanceOf(USER);
-        console.log("User's TOKEN balance after supply: %s", userBalance2);
-
-        (
-            uint256 totalCollateralBase,
-            uint256 totalDebtBase,
-            uint256 availableBorrowsBase,
-            uint256 currentLiquidationThreshold,
-            uint256 ltv,
-            uint256 healthFactor
-        ) = aaveInteraction.getStake();
-
-        console.log("Stake Data:");
-        console.log("Total Collateral Base: %s", totalCollateralBase);
-        console.log("Total Debt Base: %s", totalDebtBase);
-        console.log("Available Borrows Base: %s", availableBorrowsBase);
-        console.log(
-            "Current Liquidation Threshold: %s",
-            currentLiquidationThreshold
+        aaveInteraction.withdraw(TOKEN, amount, address(aaveInteraction));
+        assertGe(
+            token.balanceOf(address(aaveInteraction)),
+            amount,
+            "Should receive >= TOKEN at withdraw"
         );
-        console.log("LTV: %s", ltv);
-        console.log("Health Factor: %s", healthFactor);
-
-        aaveInteraction.withdraw(TOKEN, 100000000, address(aaveInteraction));
-        // console.log("Withdrew %s TOKEN from Aave", aTokenBalance);
-
-        uint256 userBalance3 = token.balanceOf(USER);
-        uint256 contractBalance = token.balanceOf(address(aaveInteraction));
-        console.log("User's TOKEN balance after withdraw: %s", userBalance3);
-        console.log("contract's Balance TOKEN  withdraw: %s", contractBalance);
-        // Stop impersonation
 
         vm.stopPrank();
-        console.log("Stopped impersonating user: %s", USER);
-
-        // Add assertions to verify the result
-
-        // Example assertion (uncomment and modify as needed)
-        // assertEq(poolBalance, amount);
     }
 }
