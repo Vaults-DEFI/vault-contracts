@@ -9,13 +9,12 @@ contract VaultScript is Script {
     function setUp() public {}
 
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PVT_KEY");
         address assetAddress = vm.envAddress("ASSET_ADDRESS");
         uint256 entryBasisPoints = vm.envUint("ENTRY_BASIS_POINTS");
         uint256 exitBasisPoints = vm.envUint("EXIT_BASIS_POINTS");
         uint32 stakeDuration = uint32(vm.envUint("STAKE_DURATION"));
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         IERC20 asset = IERC20(assetAddress);
         Vault vault = new Vault(

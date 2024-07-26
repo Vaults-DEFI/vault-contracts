@@ -20,7 +20,7 @@ contract AaveInteractionTest is Test {
 
         // contract instance
         aaveInteraction = AaveInteraction(
-            0xa138575a030a2F4977D19Cc900781E7BE3fD2bc0
+            0x2aA12f98795E7A65072950AfbA9d1E023D398241
         );
 
         // Deploy the contract
