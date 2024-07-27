@@ -36,6 +36,7 @@ contract VaultTest is Test {
 
         // deal amount of TOKENs to USER
         deal(TOKEN, USER, amount);
+        console.log(token.balanceOf(USER));
 
         token.approve(address(vault), amount);
         assertEq(

@@ -8,23 +8,26 @@ contract AaveInteractionTest is Test {
     AaveInteraction aaveInteraction;
     IERC20 token;
     IERC20 atoken;
+    IERC20 token2;
     uint256 amount;
 
     // Mainnet fork configuration
     address ADDRESS_PROVIDER = vm.envAddress("PROVIDER_ADDRESS");
+    address SWAP_ROUTER = vm.envAddress("SWAP_ROUTER");
     address TOKEN = vm.envAddress("ASSET_ADDRESS");
+    address TOKEN2 = vm.envAddress("ASSET2_ADDRESS");
     address USER = vm.envAddress("PAISA_WALA");
 
     function setUp() public {
         console.log("==SET UP(testInvest.t.sol)==");
 
         // contract instance
-        aaveInteraction = AaveInteraction(
-            0x2aA12f98795E7A65072950AfbA9d1E023D398241
-        );
+        // aaveInteraction = AaveInteraction(
+        //     0x2aA12f98795E7A65072950AfbA9d1E023D398241
+        // );
 
         // Deploy the contract
-        // aaveInteraction = new AaveInteraction(ADDRESS_PROVIDER);
+        aaveInteraction = new AaveInteraction(ADDRESS_PROVIDER, SWAP_ROUTER);
 
         console.log(
             "Deployed AaveInteraction contract at: %s",
@@ -41,10 +44,28 @@ contract AaveInteractionTest is Test {
 
         // setting up aToken of underlying token
         atoken = IERC20(aTOKEN);
+        token2 = IERC20(TOKEN2);
 
         // setting up supply/withdraw amount
         amount = 100000000;
         console.log("Setup completed.");
+    }
+
+    function testSwap() public {
+        vm.startPrank(USER);
+        console.log("Impersonated user: %s", USER);
+        token.approve(address(aaveInteraction), amount);
+        assertGe(
+            token.allowance(USER, address(aaveInteraction)),
+            amount,
+            "Allowance should be equal to the approved amount"
+        );
+
+        aaveInteraction.swapExactInputSingle(amount, TOKEN, TOKEN2);
+        assertGt(token2.balanceOf(USER), 0, "SWAP FAILED");
+        console.log("User BALANCE in TOKEN2: ", token2.balanceOf(USER));
+
+        vm.stopPrank();
     }
 
     function testSupply() public {

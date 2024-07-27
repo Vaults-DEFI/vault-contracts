@@ -9,12 +9,16 @@ contract VaultScript is Script {
     function setUp() public {}
 
     address ADDRESS_PROVIDER = vm.envAddress("PROVIDER_ADDRESS");
+    address SWAP_ROUTER = vm.envAddress("SWAP_ROUTER");
 
     function run() external {
         vm.startBroadcast();
 
         // Deploy the contract
-        AaveInteraction aaveInteraction = new AaveInteraction(ADDRESS_PROVIDER);
+        AaveInteraction aaveInteraction = new AaveInteraction(
+            ADDRESS_PROVIDER,
+            SWAP_ROUTER
+        );
 
         vm.stopBroadcast();
         console.log("Vault deployed at:", address(aaveInteraction));

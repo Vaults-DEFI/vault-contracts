@@ -19,7 +19,10 @@ contract VaultScript is Script {
         vm.startBroadcast();
 
         // Deploy the contract
-        AaveInteraction aaveInteraction = new AaveInteraction(PROVIDER_ADDRESS);
+        AaveInteraction aaveInteraction = new AaveInteraction(
+            PROVIDER_ADDRESS,
+            0xE592427A0AEce92De3Edee1F18E0157C05861564
+        );
 
         console.log("Starting testDeployAndSupply");
 

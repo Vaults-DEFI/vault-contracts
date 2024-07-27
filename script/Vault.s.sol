@@ -21,7 +21,8 @@ contract VaultScript is Script {
             asset,
             entryBasisPoints,
             exitBasisPoints,
-            stakeDuration
+            stakeDuration,
+            assetAddress
         );
 
         vm.stopBroadcast();
