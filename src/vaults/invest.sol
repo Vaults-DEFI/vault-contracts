@@ -14,18 +14,20 @@ contract AaveInteraction {
 
     mapping(address => mapping(address => uint256)) private userDeposits;
 
+    constructor(address _addressesProvider, address _swapRouter) {
+        addressesProvider = IPoolAddressesProvider(_addressesProvider);
+        lendingPool = IPool(addressesProvider.getPool());
+        swapRouter = ISwapRouter(_swapRouter);
+    }
+
     function swapExactInputSingle(
         uint256 amountIn,
         address _assetIn,
         address _assetOut
     ) external returns (uint256 amountOut) {
-        // msg.sender must approve this contract
-
         IERC20(_assetIn).transferFrom(msg.sender, address(this), amountIn);
         IERC20(_assetIn).approve(address(swapRouter), amountIn);
 
-        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
-        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: _assetIn,
@@ -38,14 +40,7 @@ contract AaveInteraction {
                 sqrtPriceLimitX96: 0
             });
 
-        // The call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
-    }
-
-    constructor(address _addressesProvider, address _swapRouter) {
-        addressesProvider = IPoolAddressesProvider(_addressesProvider);
-        lendingPool = IPool(addressesProvider.getPool());
-        swapRouter = ISwapRouter(_swapRouter);
     }
 
     function supply(address _asset, uint256 _amount) external {
