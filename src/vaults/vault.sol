@@ -14,15 +14,16 @@ contract Vault is ERC4626Fees {
     uint32 public stakeDuration;
     IERC20 public underlyingAsset;
     uint16 public referralCode;
-    ISwapRouter public swapRouter;
     address public currectStake;
+    ISwapRouter public swapRouter;
 
     constructor(
         IERC20 _asset,
         uint256 _entryBasisPoints,
         uint256 _exitBasisPoints,
         uint32 _duration,
-        address _addressesProvider
+        address _addressesProvider,
+        address _swapRouter
     )
         ERC4626Fees(_entryBasisPoints, _exitBasisPoints)
         ERC4626(_asset)
@@ -31,10 +32,42 @@ contract Vault is ERC4626Fees {
         stakeDuration = _duration;
         addressesProvider = IPoolAddressesProvider(_addressesProvider);
         lendingPool = IPool(addressesProvider.getPool());
+        swapRouter = ISwapRouter(_swapRouter);
         underlyingAsset = IERC20(_asset);
+        currectStake = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     }
 
+    event normalDepositEvent();
+    event zapDepositEvent(uint256);
+    event liquidityWithdrawnEvent(uint256);
+    event afterSwapEvent(uint256);
+
     mapping(address lender => uint32 epoch) public stakeTimeEpochMapping;
+
+    function swapExactInputSingle(
+        uint256 amountIn,
+        address _assetIn,
+        address _assetOut,
+        address _recipient,
+        uint24 _feeTier
+    ) public returns (uint256 amountOut) {
+        IERC20(_assetIn).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(_assetIn).approve(address(swapRouter), amountIn);
+
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: _assetIn,
+                tokenOut: _assetOut,
+                fee: _feeTier,
+                recipient: _recipient,
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        amountOut = swapRouter.exactInputSingle(params);
+    }
 
     function getWithdrawEpoch() public view returns (uint32) {
         return stakeTimeEpochMapping[msg.sender] + stakeDuration;
@@ -54,6 +87,74 @@ contract Vault is ERC4626Fees {
             _asset
         );
         return reserveData.aTokenAddress;
+    }
+
+    /* function zapDeposit(
+        address token,
+        uint256 assets,
+        address receiver,
+        uint24 _feeTier
+    ) public returns (uint256) {
+        uint256 amountOut;
+
+        // IERC20(token).transferFrom(msg.sender, address(this), assets);
+        // IERC20(token).approve(address(swapRouter), assets);
+        if (token != address(underlyingAsset)) {
+            // token.approve(address(aaveInteraction), amount)
+            amountOut = swapExactInputSingle(
+                assets,
+                token,
+                address(underlyingAsset),
+                _feeTier
+            );
+            // underlyingAsset.approve(address(this), amountOut);
+            emit zapDepositEvent(amountOut);
+
+            return deposit(amountOut, receiver);
+        } else {
+            emit normalDepositEvent();
+            return deposit(assets, receiver);
+        }
+    } */
+
+    function reStakeToBetterPool(
+        address _newTokenToInvest,
+        uint24 _feeTier
+    ) public onlyOwner {
+        require(_newTokenToInvest != currectStake, "no point reStaking");
+        IERC20(getATokenAddress(address(currectStake))).approve(
+            address(lendingPool),
+            type(uint256).max
+        );
+        uint256 withdrawAmount = lendingPool.withdraw(
+            address(underlyingAsset),
+            type(uint256).max,
+            address(this)
+        );
+        emit liquidityWithdrawnEvent(withdrawAmount);
+        IERC20(currectStake).approve(address(swapRouter), withdrawAmount);
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: currectStake,
+                tokenOut: _newTokenToInvest,
+                fee: _feeTier,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: withdrawAmount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        uint256 amountOut = swapRouter.exactInputSingle(params);
+        emit afterSwapEvent(amountOut);
+        IERC20(_newTokenToInvest).approve(address(lendingPool), amountOut);
+        lendingPool.deposit(
+            _newTokenToInvest,
+            amountOut,
+            address(this),
+            referralCode
+        );
+        currectStake = _newTokenToInvest;
     }
 
     /** @dev See {IERC4626-deposit}. */
@@ -161,7 +262,7 @@ contract Vault is ERC4626Fees {
 
     // function afterDeposit(uint256 assets, uint256 shares) internal virtual {}
     function afterDeposit(uint256 _amount) internal virtual {
-        underlyingAsset.transferFrom(msg.sender, address(this), _amount);
+        // underlyingAsset.transferFrom(msg.sender, address(this), _amount);
         underlyingAsset.approve(address(lendingPool), _amount);
         lendingPool.deposit(
             address(underlyingAsset),

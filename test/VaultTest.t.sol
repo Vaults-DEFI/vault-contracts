@@ -8,27 +8,68 @@ contract VaultTest is Test {
     Vault vault;
     IERC20 token;
     IERC20 atoken;
+    IERC20 token2;
     uint256 amount;
+
     // Mainnet fork configuration
     address ADDRESS_PROVIDER = vm.envAddress("PROVIDER_ADDRESS");
     address TOKEN = vm.envAddress("ASSET_ADDRESS");
+    address TOKEN2 = vm.envAddress("ASSET3_ADDRESS");
     address USER = vm.envAddress("PAISA_WALA");
+    address SWAP_ROUTER = vm.envAddress("SWAP_ROUTER");
 
     function setUp() public {
         console.log("==SET UP(testInvest.t.sol)==");
 
         // contract instance
-        vault = Vault(0xAAF0F531b7947e8492f21862471d61d5305f7538);
+        token = IERC20(TOKEN);
+        vault = new Vault(token, 0, 0, 0, ADDRESS_PROVIDER, SWAP_ROUTER);
 
         console.log("Deployed Vault contract at: %s", address(vault));
 
         // setting up underlying token
-        token = IERC20(TOKEN);
         console.log("TOKEN Address: %s", TOKEN);
+
+        // setting up token2 (take USDT for eg)
+        token2 = IERC20(TOKEN2);
 
         // setting up supply/withdraw amount
         amount = 100000000;
         console.log("Setup completed.");
+    }
+
+    // function testZapInDeposit() public {
+    //     vm.startPrank(USER);
+    //     deal(TOKEN2, USER, 100000000000000000000);
+    //     console.log("balance of user in token2", token2.balanceOf(USER));
+    //     token2.approve(address(vault), 100000000000000000000);
+    //     console.log("allowance done");
+    //     console.log("Allowance: ", token2.allowance(USER, address(vault)));
+
+    //     vault.zapDeposit(address(token2), 100000000000000000000, USER, 100);
+    //     console.log(
+    //         "contract balance of aToken2 ",
+    //         IERC20(vault.getATokenAddress(address(token2))).balanceOf(USER)
+    //     );
+
+    //     vm.stopPrank();
+    // }
+
+    function testSwap() public {
+        vm.startPrank(USER);
+        console.log("Impersonated user: %s", USER);
+        token.approve(address(vault), amount);
+        assertGe(
+            token.allowance(USER, address(vault)),
+            amount,
+            "Allowance should be equal to the approved amount"
+        );
+
+        vault.swapExactInputSingle(amount, TOKEN, TOKEN2, USER, 100);
+        assertGt(token2.balanceOf(USER), 0, "SWAP FAILED");
+        console.log("User BALANCE in TOKEN2: ", token2.balanceOf(USER));
+
+        vm.stopPrank();
     }
 
     function testDeposit() public {
@@ -36,23 +77,40 @@ contract VaultTest is Test {
 
         // deal amount of TOKENs to USER
         deal(TOKEN, USER, amount);
-        console.log(token.balanceOf(USER));
 
         token.approve(address(vault), amount);
+        console.log(
+            "allowance for deposit",
+            token.allowance(USER, address(vault))
+        );
         assertEq(
             token.allowance(USER, address(vault)),
             amount,
             "not much allowance"
         );
+
         vault.deposit(amount, USER);
-        assertEq(vault.balanceOf(USER), 99009900, "Not received enough funds");
+        assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
+
         vm.stopPrank();
+    }
+
+    function testReStakeToBetterPool() public {
+        // vm.startPrank(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
+        testDeposit();
+        vault.reStakeToBetterPool(TOKEN2, 100);
+        console.log(
+            "A2: ",
+            IERC20(vault.getATokenAddress(TOKEN2)).balanceOf(address(vault))
+        );
+        // vm.stopPrank();
     }
 
     function testWithdraw() public {
         testDeposit();
         vm.startPrank(USER);
-
+        vault.withdraw(vault.balanceOf(USER), USER, USER);
+        console.log("token balance after withdraw", token.balanceOf(USER));
         vm.stopPrank();
     }
 }

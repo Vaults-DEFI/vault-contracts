@@ -25,3 +25,11 @@ forge script script/deployInvest.s.sol --rpc-url $RPC_URL --broadcast --private-
 ```shell
 forge test --rpc-url $RPC_URL -vv
 ```
+
+# things left to do
+
+- **Accept Multiple Stablecoins**: Modify the contract to accept USDC, USDT, and DAI.
+- **Token Conversion**: Implement functionality to swap the deposited stablecoins into a single underlying token (e.g., USDC) using Uniswap.
+- **Deposit Functionality**: Ensure the converted USDC is deposited into Aave.
+- **Withdraw Functionality**: Implement withdrawal logic that calculates the correct amount of tokens to return to the user based on their shares, including any profits realized.
+- **Yield Calculation**: Calculate and realize any profits made during the withdrawal process.

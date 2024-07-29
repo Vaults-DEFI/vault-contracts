@@ -13,6 +13,8 @@ contract VaultScript is Script {
         uint256 entryBasisPoints = vm.envUint("ENTRY_BASIS_POINTS");
         uint256 exitBasisPoints = vm.envUint("EXIT_BASIS_POINTS");
         uint32 stakeDuration = uint32(vm.envUint("STAKE_DURATION"));
+        address swapRouter = vm.envAddress("SWAP_ROUTER");
+        address ADDRESS_PROVIDER = vm.envAddress("PROVIDER_ADDRESS");
 
         vm.startBroadcast();
 
@@ -22,7 +24,8 @@ contract VaultScript is Script {
             entryBasisPoints,
             exitBasisPoints,
             stakeDuration,
-            assetAddress
+            ADDRESS_PROVIDER,
+            swapRouter
         );
 
         vm.stopBroadcast();
