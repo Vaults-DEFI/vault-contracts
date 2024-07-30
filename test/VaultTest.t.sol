@@ -89,9 +89,11 @@ contract VaultTest is Test {
             "not much allowance"
         );
 
-        vault.deposit(amount, USER);
+        uint256 shares = vault.deposit(amount, USER);
+        console.log("shares", shares);
         assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
-
+        console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
+        console.log("vault token balance", vault.balanceOf(USER));
         vm.stopPrank();
     }
 
