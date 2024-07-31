@@ -38,22 +38,22 @@ contract VaultTest is Test {
         console.log("== Setup completed. ==");
     }
 
-    function testSwap() public {
-        vm.startPrank(USER);
-        console.log("Impersonated user: %s", USER);
-        token.approve(address(vault), amount);
-        assertGe(
-            token.allowance(USER, address(vault)),
-            amount,
-            "Allowance should be equal to the approved amount"
-        );
+    // function testSwap() public {
+    //     vm.startPrank(USER);
+    //     console.log("Impersonated user: %s", USER);
+    //     token.approve(address(vault), amount);
+    //     assertGe(
+    //         token.allowance(USER, address(vault)),
+    //         amount,
+    //         "Allowance should be equal to the approved amount"
+    //     );
 
-        vault.swapExactInputSingle(amount, TOKEN, TOKEN2, USER, 100);
-        assertGt(token2.balanceOf(USER), 0, "SWAP FAILED");
-        console.log("User BALANCE in TOKEN2: ", token2.balanceOf(USER));
+    //     vault.swapExactInputSingle(amount, TOKEN, TOKEN2, USER, 100);
+    //     assertGt(token2.balanceOf(USER), 0, "SWAP FAILED");
+    //     console.log("User BALANCE in TOKEN2: ", token2.balanceOf(USER));
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
     function testDeposit() public {
         vm.startPrank(USER);
@@ -112,7 +112,7 @@ contract VaultTest is Test {
         testDeposit();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
-        vault.withdrawAToken(amount, USER);
+        vault.withdraw(amount, USER, USER);
         console.log("withdraw done==============================");
 
         console.log(
@@ -129,7 +129,7 @@ contract VaultTest is Test {
         testReStakeToBetterPool();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
-        vault.withdrawAToken(amount, USER);
+        vault.withdraw(amount, USER, USER);
         console.log("withdraw done==============================");
 
         console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
