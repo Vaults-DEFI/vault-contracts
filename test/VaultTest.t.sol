@@ -38,24 +38,7 @@ contract VaultTest is Test {
         console.log("== Setup completed. ==");
     }
 
-    function testZapInDeposit() public {
-        vm.startPrank(USER);
-        deal(TOKEN2, USER, 100000000000000000000);
-        console.log("balance of user in token2", token2.balanceOf(USER));
-        token2.approve(address(vault), 100000000000000000000);
-        console.log("allowance done");
-        console.log("Allowance: ", token2.allowance(USER, address(vault)));
-
-        vault.zapDeposit(address(token2), 100000000000000000000, USER, 100);
-        console.log(
-            "contract balance of aToken2 ",
-            IERC20(vault.getATokenAddress(address(token2))).balanceOf(USER)
-        );
-
-        vm.stopPrank();
-    }
-
-    /* function testSwap() public {
+    function testSwap() public {
         vm.startPrank(USER);
         console.log("Impersonated user: %s", USER);
         token.approve(address(vault), amount);
@@ -70,7 +53,7 @@ contract VaultTest is Test {
         console.log("User BALANCE in TOKEN2: ", token2.balanceOf(USER));
 
         vm.stopPrank();
-    } */
+    }
 
     function testDeposit() public {
         vm.startPrank(USER);
@@ -97,7 +80,24 @@ contract VaultTest is Test {
         vm.stopPrank();
     }
 
-    /* function testReStakeToBetterPool() public {
+    function testZapInDeposit() public {
+        vm.startPrank(USER);
+        deal(TOKEN2, USER, 100000000000000000000);
+        console.log("balance of user in token2", token2.balanceOf(USER));
+        token2.approve(address(vault), 100000000000000000000);
+        console.log("allowance done");
+        console.log("Allowance: ", token2.allowance(USER, address(vault)));
+
+        vault.zapDeposit(address(token2), 100000000000000000000, USER, 100);
+        console.log(
+            "contract balance of aToken2 ",
+            IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
+        );
+
+        vm.stopPrank();
+    }
+
+    function testReStakeToBetterPool() public {
         // vm.startPrank(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
         testDeposit();
         vault.reStakeToBetterPool(TOKEN2, 100);
@@ -106,7 +106,7 @@ contract VaultTest is Test {
             IERC20(vault.getATokenAddress(TOKEN2)).balanceOf(address(vault))
         );
         // vm.stopPrank();
-    } */
+    }
 
     function testWithdraw() public {
         testDeposit();
@@ -117,10 +117,22 @@ contract VaultTest is Test {
 
         console.log(
             "atoken balance after withdraw",
-            IERC20(vault.getATokenAddress(address(token))).balanceOf(USER)
+            IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
         );
         console.log("vToken balance after withdraw", vault.balanceOf(USER));
         console.log("USDC balance after withdraw", token.balanceOf(USER));
+        vm.stopPrank();
+    }
+
+    function testWithdraw2() public {
+        console.log("deposit done from 2");
+        testReStakeToBetterPool();
+        vm.startPrank(USER);
+        console.log("gonna go withdraw==============================");
+        vault.withdrawAToken(amount, USER);
+        console.log("withdraw done==============================");
+
+        console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
         vm.stopPrank();
     }
 }
