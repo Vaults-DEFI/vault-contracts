@@ -84,7 +84,7 @@ contract VaultTest is Test {
         console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
         console.log("vault token balance", vault.balanceOf(USER));
         console.log(
-            "vaultotke bal ke bnad",
+            "total supply adn total assets",
             vault.totalSupply(),
             vault.totalAssets()
         );
@@ -116,7 +116,7 @@ contract VaultTest is Test {
         console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
         console.log("vault token balance", vault.balanceOf(USER2));
         console.log(
-            "vaultotke bal ke bnad",
+            "total supply adn total assets",
             vault.totalSupply(),
             vault.totalAssets()
         );
