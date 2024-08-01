@@ -7,8 +7,11 @@ import "../interfaces/aave/IPool.sol";
 import "../interfaces/aave/IPoolAddressesProvider.sol";
 import "../interfaces/uniswap/ISwapRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract Vault is ERC4626Fees {
+    using Math for uint256;
+
     IPoolAddressesProvider public addressesProvider;
     IPool public lendingPool;
     uint32 public stakeDuration;
@@ -42,6 +45,11 @@ contract Vault is ERC4626Fees {
     event afterSwapEvent(uint256);
     event withdrawFromAaveEvent(uint256);
     event movedToAaveEvent(address, uint256);
+    event mango(uint256);
+    event apple(uint256);
+    event sharesDetails(uint256, uint256);
+    event beforeAaveDepositEvent(uint256);
+    event afterAaveEvent(uint256);
 
     mapping(address lender => uint32 epoch) public stakeTimeEpochMapping;
 
@@ -136,6 +144,40 @@ contract Vault is ERC4626Fees {
         currentStake = _newTokenToInvest;
     }
 
+    /** @dev See {IERC4626-previewDeposit}. */
+    function previewDeposit(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
+        uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
+
+        return _convertToShares(assets - fee, Math.Rounding.Floor);
+    }
+
+    /// @dev Preview adding an entry fee on mint. See {IERC4626-previewMint}.
+    function previewMint(
+        uint256 shares
+    ) public view virtual override returns (uint256) {
+        uint256 assets = _convertToAssets(shares, Math.Rounding.Ceil);
+        return assets + _feeOnRaw(assets, _entryFeeBasisPoints());
+    }
+
+    /// @dev Preview adding an exit fee on withdraw. See {IERC4626-previewWithdraw}.
+    function previewWithdraw(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
+        uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
+
+        return _convertToShares(assets + fee, Math.Rounding.Ceil);
+    }
+
+    /// @dev Preview taking an exit fee on redeem. See {IERC4626-previewRedeem}.
+    function previewRedeem(
+        uint256 shares
+    ) public view virtual override returns (uint256) {
+        uint256 assets = _convertToAssets(shares, Math.Rounding.Floor);
+        return assets - _feeOnRaw(assets, _entryFeeBasisPoints());
+    }
+
     /** @dev See {IERC4626-deposit}. */
     function deposit(
         uint256 assets,
@@ -147,9 +189,12 @@ contract Vault is ERC4626Fees {
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
+        // uint256 shares = previewDeposit(assets);
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
-        afterDeposit(assets);
+        emit beforeAaveDepositEvent(shares);
+        uint256 fee = _feeOnRaw(assets, _exitFeeBasisPoints());
+        afterDeposit(assets - fee);
 
         // overridden
         stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
@@ -199,8 +244,44 @@ contract Vault is ERC4626Fees {
         return shares;
     } */
 
-    function withdraw(
+    /**
+     * @dev Internal conversion function (from assets to shares) with support for rounding direction.
+     * function overridden to change the totalAssets()
+     */
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256) {
+        return
+            assets.mulDiv(
+                totalSupply() + 10 ** _decimalsOffset(),
+                IERC20(getATokenAddress(currentStake)).balanceOf(
+                    address(this)
+                ) + 1,
+                rounding
+            );
+    }
+
+    /**
+     * @dev Internal conversion function (from shares to assets) with support for rounding direction.
+     * function overridden to change the totalAssets()
+     */
+    function _convertToAssets(
         uint256 shares,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256) {
+        return
+            shares.mulDiv(
+                IERC20(getATokenAddress(currentStake)).balanceOf(
+                    address(this)
+                ) + 1,
+                totalSupply() + 10 ** _decimalsOffset(),
+                rounding
+            );
+    }
+
+    function withdraw(
+        uint256 assets,
         address receiver,
         address owner
     ) public virtual override returns (uint256) {
@@ -208,16 +289,32 @@ contract Vault is ERC4626Fees {
             getWithdrawEpoch() <= _blockTimestamp(),
             "Not eligible right now, funds can be redeemed after locking period"
         );
+        // uint256 maxAssets = maxWithdraw(owner);
+        // if (assets > maxAssets) {
+        //     revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
+        // }
+
+        uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
+            .balanceOf(address(this));
+        uint256 totalSupplyShares = totalSupply();
+        uint256 shares = _convertToShares(assets, Math.Rounding.Ceil);
+        uint256 maxShares = maxRedeem(owner);
+        emit sharesDetails(shares, maxShares);
+
+        // emit mango();
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
+
+        emit mango(shares);
+
         if (msg.sender != owner) {
             _spendAllowance(owner, msg.sender, shares);
         }
 
-        uint256 maxShares = maxRedeem(msg.sender);
         require(shares <= maxShares, "ERC4626: withdraw more than max");
 
-        uint256 totalSupplyShares = totalSupply();
-        uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
-            .balanceOf(address(this));
+        ///
         uint256 aTokensToWithdraw = (shares * aTokenBalance) /
             totalSupplyShares;
 
@@ -245,22 +342,41 @@ contract Vault is ERC4626Fees {
         address receiver,
         address owner
     ) public virtual override returns (uint256) {
-        // overridden
         require(
             getWithdrawEpoch() <= _blockTimestamp(),
-            "Not eligible right now, funds can be redeem after locking period"
+            "Not eligible right now, funds can be redeemed after locking period"
         );
-
         uint256 maxShares = maxRedeem(owner);
+        emit apple(maxShares);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
+        if (msg.sender != owner) {
+            _spendAllowance(owner, msg.sender, shares);
+        }
+        ///
+        uint256 totalSupplyShares = totalSupply();
+        uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
+            .balanceOf(address(this));
+        uint256 aTokensToWithdraw = (shares * aTokenBalance) /
+            totalSupplyShares;
 
-        uint256 assets = previewRedeem(shares);
-        beforeWithdraw(assets);
-        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        // Burn shares and update internal accounting
+        _burn(owner, shares);
 
-        return assets;
+        // Approve and withdraw the corresponding amount of the underlying asset from Aave
+        IERC20(getATokenAddress(currentStake)).approve(
+            address(lendingPool),
+            aTokensToWithdraw
+        );
+        uint256 amountWithdrawn = lendingPool.withdraw(
+            currentStake,
+            aTokensToWithdraw,
+            receiver
+        );
+        emit Withdraw(msg.sender, receiver, owner, amountWithdrawn, shares);
+
+        return amountWithdrawn;
     }
 
     function changeEntryFee(uint256 _fee) public onlyOwner {

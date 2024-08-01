@@ -25,12 +25,12 @@ abstract contract ERC4626Fees is ERC4626, Ownable {
     // === Overrides ===
 
     /// @dev Preview taking an entry fee on deposit. See {IERC4626-previewDeposit}.
-    function previewDeposit(
-        uint256 assets
-    ) public view virtual override returns (uint256) {
-        uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
-        return super.previewDeposit(assets - fee);
-    }
+    // function previewDeposit(
+    //     uint256 assets
+    // ) public view virtual override returns (uint256) {
+    //     uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
+    //     return super.previewDeposit(assets - fee);
+    // }
 
     /// @dev Preview adding an entry fee on mint. See {IERC4626-previewMint}.
     function previewMint(
@@ -102,11 +102,11 @@ abstract contract ERC4626Fees is ERC4626, Ownable {
     }
 
     function _entryFeeRecipient() internal view virtual returns (address) {
-        return address(this);
+        return 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
     }
 
     function _exitFeeRecipient() internal view virtual returns (address) {
-        return address(this);
+        return 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
     }
 
     // === Fee operations ===
@@ -116,7 +116,7 @@ abstract contract ERC4626Fees is ERC4626, Ownable {
     function _feeOnRaw(
         uint256 assets,
         uint256 feeBasisPoints
-    ) private pure returns (uint256) {
+    ) internal pure returns (uint256) {
         return
             assets.mulDiv(
                 feeBasisPoints,
@@ -130,7 +130,7 @@ abstract contract ERC4626Fees is ERC4626, Ownable {
     function _feeOnTotal(
         uint256 assets,
         uint256 feeBasisPoints
-    ) private pure returns (uint256) {
+    ) internal pure returns (uint256) {
         return
             assets.mulDiv(
                 feeBasisPoints,

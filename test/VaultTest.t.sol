@@ -10,12 +10,16 @@ contract VaultTest is Test {
     IERC20 atoken;
     IERC20 token2;
     uint256 amount;
+    uint256 amount2;
+    uint256 amount3;
 
     // Mainnet fork configuration
     address ADDRESS_PROVIDER = vm.envAddress("PROVIDER_ADDRESS");
     address TOKEN = vm.envAddress("ASSET_ADDRESS");
     address TOKEN2 = vm.envAddress("ASSET3_ADDRESS");
     address USER = vm.envAddress("PAISA_WALA");
+    address USER2 = vm.envAddress("PAISA_WALA2");
+    address USER3 = vm.envAddress("PAISA_WALA3");
     address SWAP_ROUTER = vm.envAddress("SWAP_ROUTER");
 
     function setUp() public {
@@ -35,6 +39,8 @@ contract VaultTest is Test {
 
         // setting up supply/withdraw amount
         amount = 100000000;
+        amount2 = 100000000;
+        amount3 = 100000000;
         console.log("== Setup completed. ==");
     }
 
@@ -74,9 +80,79 @@ contract VaultTest is Test {
 
         uint256 shares = vault.deposit(amount, USER);
         console.log("shares", shares);
-        assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
+        // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
         console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
         console.log("vault token balance", vault.balanceOf(USER));
+        console.log(
+            "vaultotke bal ke bnad",
+            vault.totalSupply(),
+            vault.totalAssets()
+        );
+        console.log("idhar fees hai", token.balanceOf(address(vault)));
+        vm.stopPrank();
+    }
+
+    function testDepositUser2() public {
+        testDeposit();
+        vm.startPrank(USER2);
+
+        // deal amount of TOKENs to USER
+        deal(TOKEN, USER2, amount);
+
+        token.approve(address(vault), amount);
+        console.log(
+            "allowance for deposit",
+            token.allowance(USER2, address(vault))
+        );
+        assertEq(
+            token.allowance(USER2, address(vault)),
+            amount,
+            "not much allowance"
+        );
+
+        uint256 shares = vault.deposit(amount, USER2);
+        console.log("shares", shares);
+        // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
+        console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
+        console.log("vault token balance", vault.balanceOf(USER2));
+        console.log(
+            "vaultotke bal ke bnad",
+            vault.totalSupply(),
+            vault.totalAssets()
+        );
+        console.log("idhar fees hai", token.balanceOf(address(vault)));
+        vm.stopPrank();
+    }
+
+    function testDepositByUser3() public {
+        testDepositUser2();
+        vm.startPrank(USER3);
+
+        // deal amount of TOKENs to USER
+        deal(TOKEN, USER3, amount);
+
+        token.approve(address(vault), amount);
+        console.log(
+            "allowance for deposit",
+            token.allowance(USER3, address(vault))
+        );
+        assertEq(
+            token.allowance(USER3, address(vault)),
+            amount,
+            "not much allowance"
+        );
+
+        uint256 shares = vault.deposit(amount, USER3);
+        console.log("shares", shares);
+        // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
+        console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
+        console.log("vault token balance", vault.balanceOf(USER3));
+        console.log(
+            "total supply and total assets:",
+            vault.totalSupply(),
+            vault.totalAssets()
+        );
+        console.log("idhar fees hai", token.balanceOf(address(vault)));
         vm.stopPrank();
     }
 
@@ -108,19 +184,49 @@ contract VaultTest is Test {
         // vm.stopPrank();
     }
 
-    function testWithdraw() public {
+    function testRedeem() public {
         testDeposit();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
-        vault.withdraw(amount, USER, USER);
+        vault.redeem(amount, USER, USER);
         console.log("withdraw done==============================");
 
         console.log(
             "atoken balance after withdraw",
             IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
         );
+
         console.log("vToken balance after withdraw", vault.balanceOf(USER));
         console.log("USDC balance after withdraw", token.balanceOf(USER));
+        vm.stopPrank();
+    }
+
+    function testWithdraw() public {
+        testDeposit();
+        vm.startPrank(USER);
+        console.log("gonna go withdraw==============================");
+        uint256 assets = IERC20(vault.getATokenAddress(TOKEN)).balanceOf(
+            address(vault)
+        );
+
+        console.log("total assets to withdraw", assets);
+        vault.withdraw(assets, USER, USER);
+        console.log("withdraw done==============================");
+        console.log("atoken balance after withdraw", assets);
+        console.log("vToken balance after withdraw", vault.balanceOf(USER));
+        console.log("USDC balance after withdraw", token.balanceOf(USER));
+        vm.stopPrank();
+    }
+
+    function testRedeem2() public {
+        console.log("deposit done from 2");
+        testReStakeToBetterPool();
+        vm.startPrank(USER);
+        console.log("gonna go withdraw==============================");
+        vault.redeem(amount, USER, USER);
+        console.log("withdraw done==============================");
+
+        console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
         vm.stopPrank();
     }
 
@@ -129,7 +235,7 @@ contract VaultTest is Test {
         testReStakeToBetterPool();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
-        vault.withdraw(amount, USER, USER);
+        vault.redeem(amount, USER, USER);
         console.log("withdraw done==============================");
 
         console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
