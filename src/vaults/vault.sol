@@ -40,25 +40,51 @@ contract Vault is ERC4626Fees {
         currentStake = address(_asset);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          EVENTS
+    //////////////////////////////////////////////////////////////*/
+
     event zapDepositEvent(uint256);
     event liquidityWithdrawnEvent(uint256);
     event afterSwapEvent(uint256);
     event withdrawFromAaveEvent(uint256);
     event movedToAaveEvent(address, uint256);
-    event mango(uint256);
-    event apple(uint256);
+
     event sharesDetails(uint256, uint256);
     event beforeAaveDepositEvent(uint256);
     event afterAaveEvent(uint256);
 
+    /*//////////////////////////////////////////////////////////////
+                          MAPPINGS
+    //////////////////////////////////////////////////////////////*/
+
     mapping(address lender => uint32 epoch) public stakeTimeEpochMapping;
 
-    function getWithdrawEpoch() public view returns (uint32) {
-        return stakeTimeEpochMapping[msg.sender] + stakeDuration;
+    /*//////////////////////////////////////////////////////////////
+                          MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+    modifier nonZero(uint256 _value) {
+        require(
+            _value != 0,
+            "Value must be greater than zero. Please enter a valid amount"
+        );
+        _;
     }
 
-    function setDuration(uint32 _duration) public onlyOwner {
-        stakeDuration = _duration;
+    modifier canWithdraw(address _owner) {
+        require(
+            getWithdrawEpoch(_owner) <= _blockTimestamp(),
+            "Not eligible right now, funds can be redeemed after locking period"
+        );
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function getWithdrawEpoch(address _owner) public view returns (uint32) {
+        return stakeTimeEpochMapping[_owner] + stakeDuration;
     }
 
     // for gas efficiency
@@ -74,35 +100,9 @@ contract Vault is ERC4626Fees {
         return reserveData.aTokenAddress;
     }
 
-    function zapDeposit(
-        address token,
-        uint256 assets,
-        address receiver,
-        uint24 _feeTier
-    ) public returns (uint256) {
-        uint256 amountOut;
-
-        // transfer funds to the vault contract
-        IERC20(token).transferFrom(msg.sender, address(this), assets);
-        IERC20(token).approve(address(swapRouter), assets);
-        if (token != address(underlyingAsset)) {
-            amountOut = swapExactInputSingle(
-                assets,
-                token,
-                currentStake,
-                address(this),
-                _feeTier
-            );
-            uint256 shares = previewDeposit(amountOut);
-            _mint(receiver, shares);
-            emit Deposit(receiver, receiver, amountOut, shares);
-            afterDeposit(amountOut);
-            emit zapDepositEvent(amountOut);
-            return shares;
-        } else {
-            return deposit(assets, receiver);
-        }
-    }
+    /*//////////////////////////////////////////////////////////////
+                          STRATEGY CALLS (ONLY OWNER)
+    //////////////////////////////////////////////////////////////*/
 
     function reStakeToBetterPool(
         address _newTokenToInvest,
@@ -144,6 +144,26 @@ contract Vault is ERC4626Fees {
         currentStake = _newTokenToInvest;
     }
 
+    function changeEntryFee(uint256 _fee) public onlyOwner {
+        entryFeeBasisPoints = _fee;
+    }
+
+    function changeExitFee(uint256 _fee) public onlyOwner {
+        exitFeeBasisPoints = _fee;
+    }
+
+    function setReferralCode(uint16 _referralCode) public onlyOwner {
+        referralCode = _referralCode;
+    }
+
+    function setDuration(uint32 _duration) public onlyOwner {
+        stakeDuration = _duration;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          ERC4626 overrides
+    //////////////////////////////////////////////////////////////*/
+
     /** @dev See {IERC4626-previewDeposit}. */
     function previewDeposit(
         uint256 assets
@@ -177,72 +197,6 @@ contract Vault is ERC4626Fees {
         uint256 assets = _convertToAssets(shares, Math.Rounding.Floor);
         return assets - _feeOnRaw(assets, _entryFeeBasisPoints());
     }
-
-    /** @dev See {IERC4626-deposit}. */
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) public virtual override returns (uint256) {
-        require(assets > 0, "Assets can't be zero");
-        uint256 maxAssets = maxDeposit(receiver);
-        if (assets > maxAssets) {
-            revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
-        }
-
-        // uint256 shares = previewDeposit(assets);
-        uint256 shares = previewDeposit(assets);
-        _deposit(_msgSender(), receiver, assets, shares);
-        emit beforeAaveDepositEvent(shares);
-        uint256 fee = _feeOnRaw(assets, _exitFeeBasisPoints());
-        afterDeposit(assets - fee);
-
-        // overridden
-        stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
-
-        return shares;
-    }
-
-    /** @dev See {IERC4626-mint}.
-     *
-     * As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
-     * In this case, the shares will be minted without requiring any assets to be deposited.
-     */
-    function mint(
-        uint256 shares,
-        address receiver
-    ) public virtual override returns (uint256) {
-        require(shares <= maxMint(receiver), "ERC4626: mint more than max");
-
-        uint256 assets = previewMint(shares);
-        _deposit(_msgSender(), receiver, assets, shares);
-        afterDeposit(assets);
-        stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
-        return assets;
-    }
-
-    /** @dev See {IERC4626-withdraw}. */
-    /* function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) public virtual override returns (uint256) {
-        // overridden
-        require(
-            getWithdrawEpoch() <= _blockTimestamp(),
-            "Not eligible right now, funds can be redeem after locking period"
-        );
-        beforeWithdraw(assets);
-
-        uint256 maxAssets = maxWithdraw(owner);
-        if (assets > maxAssets) {
-            revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
-        }
-
-        uint256 shares = previewWithdraw(assets);
-        _withdraw(_msgSender(), receiver, owner, assets, shares);
-
-        return shares;
-    } */
 
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
@@ -280,20 +234,102 @@ contract Vault is ERC4626Fees {
             );
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          (3) DEPOSIT functions
+                          - deposit
+                          - mint
+                          - zapDeposit
+    //////////////////////////////////////////////////////////////*/
+
+    /** @dev See {IERC4626-deposit}. */
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) public virtual override nonZero(assets) returns (uint256) {
+        uint256 maxAssets = maxDeposit(receiver);
+        if (assets > maxAssets) {
+            revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
+        }
+
+        // uint256 shares = previewDeposit(assets);
+        uint256 shares = previewDeposit(assets);
+        _deposit(_msgSender(), receiver, assets, shares);
+        emit beforeAaveDepositEvent(shares);
+        uint256 fee = _feeOnRaw(assets, _exitFeeBasisPoints());
+        afterDeposit(assets - fee);
+
+        // overridden
+        stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
+
+        return shares;
+    }
+
+    /** @dev See {IERC4626-mint}.
+     *
+     * As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
+     * In this case, the shares will be minted without requiring any assets to be deposited.
+     */
+    function mint(
+        uint256 shares,
+        address receiver
+    ) public virtual override nonZero(shares) returns (uint256) {
+        require(shares <= maxMint(receiver), "ERC4626: mint more than max");
+
+        uint256 assets = previewMint(shares);
+        _deposit(_msgSender(), receiver, assets, shares);
+        afterDeposit(assets);
+        stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
+        return assets;
+    }
+
+    // function zapDeposit(
+    //     address token,
+    //     uint256 assets,
+    //     address receiver,
+    //     uint24 _feeTier
+    // ) public nonZero(assets) returns (uint256) {
+    //     uint256 amountOut;
+
+    //     // transfer funds to the vault contract
+    //     IERC20(token).transferFrom(msg.sender, address(this), assets);
+    //     IERC20(token).approve(address(swapRouter), assets);
+    //     if (token != address(underlyingAsset)) {
+    //         amountOut = swapExactInputSingle(
+    //             assets,
+    //             token,
+    //             currentStake,
+    //             address(this),
+    //             _feeTier
+    //         );
+    //         uint256 shares = previewDeposit(amountOut);
+    //         _mint(receiver, shares);
+    //         emit Deposit(receiver, receiver, amountOut, shares);
+    //         afterDeposit(amountOut);
+    //         emit zapDepositEvent(amountOut);
+    //         return shares;
+    //     } else {
+    //         return deposit(assets, receiver);
+    //     }
+    // }
+
+    /*//////////////////////////////////////////////////////////////
+                          (2) Withdraw functions
+                          - withdraw
+                          - redeem
+    //////////////////////////////////////////////////////////////*/
+
     function withdraw(
         uint256 assets,
         address receiver,
         address owner
-    ) public virtual override returns (uint256) {
-        require(
-            getWithdrawEpoch() <= _blockTimestamp(),
-            "Not eligible right now, funds can be redeemed after locking period"
-        );
-        // uint256 maxAssets = maxWithdraw(owner);
-        // if (assets > maxAssets) {
-        //     revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
-        // }
-
+    )
+        public
+        virtual
+        override
+        nonZero(assets)
+        canWithdraw(owner)
+        returns (uint256)
+    {
         uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
             .balanceOf(address(this));
         uint256 totalSupplyShares = totalSupply();
@@ -301,12 +337,9 @@ contract Vault is ERC4626Fees {
         uint256 maxShares = maxRedeem(owner);
         emit sharesDetails(shares, maxShares);
 
-        // emit mango();
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
-
-        emit mango(shares);
 
         if (msg.sender != owner) {
             _spendAllowance(owner, msg.sender, shares);
@@ -314,14 +347,11 @@ contract Vault is ERC4626Fees {
 
         require(shares <= maxShares, "ERC4626: withdraw more than max");
 
-        ///
         uint256 aTokensToWithdraw = (shares * aTokenBalance) /
             totalSupplyShares;
 
-        // Burn shares and update internal accounting
         _burn(owner, shares);
 
-        // Approve and withdraw the corresponding amount of the underlying asset from Aave
         IERC20(getATokenAddress(currentStake)).approve(
             address(lendingPool),
             aTokensToWithdraw
@@ -341,30 +371,29 @@ contract Vault is ERC4626Fees {
         uint256 shares,
         address receiver,
         address owner
-    ) public virtual override returns (uint256) {
-        require(
-            getWithdrawEpoch() <= _blockTimestamp(),
-            "Not eligible right now, funds can be redeemed after locking period"
-        );
+    )
+        public
+        virtual
+        override
+        nonZero(shares)
+        canWithdraw(owner)
+        returns (uint256)
+    {
         uint256 maxShares = maxRedeem(owner);
-        emit apple(maxShares);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
         if (msg.sender != owner) {
             _spendAllowance(owner, msg.sender, shares);
         }
-        ///
         uint256 totalSupplyShares = totalSupply();
         uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
             .balanceOf(address(this));
         uint256 aTokensToWithdraw = (shares * aTokenBalance) /
             totalSupplyShares;
 
-        // Burn shares and update internal accounting
         _burn(owner, shares);
 
-        // Approve and withdraw the corresponding amount of the underlying asset from Aave
         IERC20(getATokenAddress(currentStake)).approve(
             address(lendingPool),
             aTokensToWithdraw
@@ -379,18 +408,6 @@ contract Vault is ERC4626Fees {
         return amountWithdrawn;
     }
 
-    function changeEntryFee(uint256 _fee) public onlyOwner {
-        entryFeeBasisPoints = _fee;
-    }
-
-    function changeExitFee(uint256 _fee) public onlyOwner {
-        exitFeeBasisPoints = _fee;
-    }
-
-    function setReferralCode(uint16 _referralCode) public onlyOwner {
-        referralCode = _referralCode;
-    }
-
     // Just a swap function which makes a swap from uniswap
     function swapExactInputSingle(
         uint256 amountIn,
@@ -398,7 +415,7 @@ contract Vault is ERC4626Fees {
         address _assetOut,
         address _recipient,
         uint24 _feeTier
-    ) internal returns (uint256 amountOut) {
+    ) internal nonZero(amountIn) returns (uint256 amountOut) {
         // IERC20(_assetIn).transferFrom(msg.sender, address(this), amountIn);
         // IERC20(_assetIn).approve(address(swapRouter), amountIn);
 
@@ -421,17 +438,30 @@ contract Vault is ERC4626Fees {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // function afterDeposit(uint256 assets, uint256 shares) internal virtual {}
-    function afterDeposit(uint256 _amount) internal virtual {
-        // underlyingAsset.transferFrom(msg.sender, address(this), _amount);
-        underlyingAsset.approve(address(lendingPool), _amount);
-        lendingPool.deposit(currentStake, _amount, address(this), referralCode);
-        emit movedToAaveEvent(currentStake, _amount);
+    function afterDeposit(uint256 _amount) internal virtual nonZero(_amount) {
+        uint256 amountToAdd = _amount;
+        if (currentStake != address(underlyingAsset)) {
+            amountToAdd = swapExactInputSingle(
+                _amount,
+                address(underlyingAsset),
+                currentStake,
+                address(this),
+                100
+            );
+        }
+        IERC20(currentStake).approve(address(lendingPool), amountToAdd);
+        lendingPool.deposit(
+            currentStake,
+            amountToAdd,
+            address(this),
+            referralCode
+        );
+        emit movedToAaveEvent(currentStake, amountToAdd);
     }
 
     function beforeWithdraw(
         uint256 _amount
-    ) internal virtual returns (uint256) {
+    ) internal virtual nonZero(_amount) returns (uint256) {
         IERC20(getATokenAddress(address(currentStake))).approve(
             address(lendingPool),
             _amount

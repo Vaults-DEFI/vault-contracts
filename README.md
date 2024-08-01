@@ -33,3 +33,13 @@ forge test --rpc-url $RPC_URL -vv
 - **Deposit Functionality**: Ensure the converted USDC is deposited into Aave.
 - **Withdraw Functionality**: Implement withdrawal logic that calculates the correct amount of tokens to return to the user based on their shares, including any profits realized.
 - **Yield Calculation**: Calculate and realize any profits made during the withdrawal process.
+
+```sol
+function testDRD() public {
+        testReStakeToBetterPool();
+        console.log("=====pool changed=====");
+        testDeposit();
+        console.log("=====DRD DONE=====");
+    }
+
+```
