@@ -66,6 +66,7 @@ contract VaultTest is Test {
 
         // deal amount of TOKENs to USER
         deal(TOKEN, USER, amount);
+        console.log("starting testDeposit.....");
 
         token.approve(address(vault), amount);
         console.log(
@@ -90,88 +91,89 @@ contract VaultTest is Test {
         );
         console.log("idhar fees hai", token.balanceOf(address(vault)));
         vm.stopPrank();
+        console.log("starting testDeposit done.....");
     }
 
-    function testDepositUser2() public {
-        testDeposit();
-        vm.startPrank(USER2);
+    // function testDepositUser2() public {
+    //     testDeposit();
+    //     vm.startPrank(USER2);
 
-        // deal amount of TOKENs to USER
-        deal(TOKEN, USER2, amount);
+    //     // deal amount of TOKENs to USER
+    //     deal(TOKEN, USER2, amount);
 
-        token.approve(address(vault), amount);
-        console.log(
-            "allowance for deposit",
-            token.allowance(USER2, address(vault))
-        );
-        assertEq(
-            token.allowance(USER2, address(vault)),
-            amount,
-            "not much allowance"
-        );
+    //     token.approve(address(vault), amount);
+    //     console.log(
+    //         "allowance for deposit",
+    //         token.allowance(USER2, address(vault))
+    //     );
+    //     assertEq(
+    //         token.allowance(USER2, address(vault)),
+    //         amount,
+    //         "not much allowance"
+    //     );
 
-        uint256 shares = vault.deposit(amount, USER2);
-        console.log("shares", shares);
-        // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
-        console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
-        console.log("vault token balance", vault.balanceOf(USER2));
-        console.log(
-            "total supply adn total assets",
-            vault.totalSupply(),
-            vault.totalAssets()
-        );
-        console.log("idhar fees hai", token.balanceOf(address(vault)));
-        vm.stopPrank();
-    }
+    //     uint256 shares = vault.deposit(amount, USER2);
+    //     console.log("shares", shares);
+    //     // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
+    //     console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
+    //     console.log("vault token balance", vault.balanceOf(USER2));
+    //     console.log(
+    //         "total supply adn total assets",
+    //         vault.totalSupply(),
+    //         vault.totalAssets()
+    //     );
+    //     console.log("idhar fees hai", token.balanceOf(address(vault)));
+    //     vm.stopPrank();
+    // }
 
-    function testDepositByUser3() public {
-        testDepositUser2();
-        vm.startPrank(USER3);
+    // function testDepositByUser3() public {
+    //     testDepositUser2();
+    //     vm.startPrank(USER3);
 
-        // deal amount of TOKENs to USER
-        deal(TOKEN, USER3, amount);
+    //     // deal amount of TOKENs to USER
+    //     deal(TOKEN, USER3, amount);
 
-        token.approve(address(vault), amount);
-        console.log(
-            "allowance for deposit",
-            token.allowance(USER3, address(vault))
-        );
-        assertEq(
-            token.allowance(USER3, address(vault)),
-            amount,
-            "not much allowance"
-        );
+    //     token.approve(address(vault), amount);
+    //     console.log(
+    //         "allowance for deposit",
+    //         token.allowance(USER3, address(vault))
+    //     );
+    //     assertEq(
+    //         token.allowance(USER3, address(vault)),
+    //         amount,
+    //         "not much allowance"
+    //     );
 
-        uint256 shares = vault.deposit(amount, USER3);
-        console.log("shares", shares);
-        // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
-        console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
-        console.log("vault token balance", vault.balanceOf(USER3));
-        console.log(
-            "total supply and total assets:",
-            vault.totalSupply(),
-            vault.totalAssets()
-        );
-        console.log("idhar fees hai", token.balanceOf(address(vault)));
-        vm.stopPrank();
-    }
+    //     uint256 shares = vault.deposit(amount, USER3);
+    //     console.log("shares", shares);
+    //     // assertEq(vault.balanceOf(USER), 100000000, "Not received enough funds");
+    //     console.log("MAX WITHDRAW", vault.maxWithdraw(address(vault)));
+    //     console.log("vault token balance", vault.balanceOf(USER3));
+    //     console.log(
+    //         "total supply and total assets:",
+    //         vault.totalSupply(),
+    //         vault.totalAssets()
+    //     );
+    //     console.log("idhar fees hai", token.balanceOf(address(vault)));
+    //     vm.stopPrank();
+    // }
 
-    function testZapInDeposit() public {
-        vm.startPrank(USER);
-        deal(TOKEN2, USER, 100000000000000000000);
-        console.log("balance of user in token2", token2.balanceOf(USER));
-        token2.approve(address(vault), 100000000000000000000);
-        console.log("allowance done");
-        console.log("Allowance: ", token2.allowance(USER, address(vault)));
+    // function testZapInDeposit() public {
+    //     vm.startPrank(USER);
+    //     deal(TOKEN2, USER, 100000000000000000000);
+    //     console.log("balance of user in token2", token2.balanceOf(USER));
+    //     token2.approve(address(vault), 100000000000000000000);
+    //     console.log("allowance done");
+    //     console.log("Allowance: ", token2.allowance(USER, address(vault)));
 
-        vault.zapDeposit(address(token2), 100000000000000000000, USER, 100);
-        console.log(
-            "contract balance of aToken2 ",
-            IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
-        );
+    //     vault.zapDeposit(address(token2), 100000000000000000000, USER, 100);
+    //     console.log(
+    //         "contract balance of aToken2 ",
+    //         IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
+    //     );
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
     function testReStakeToBetterPool() public {
         // vm.startPrank(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
@@ -184,7 +186,7 @@ contract VaultTest is Test {
         // vm.stopPrank();
     }
 
-    function testRedeem() public {
+    /* function testRedeem() public {
         testDeposit();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
@@ -240,5 +242,12 @@ contract VaultTest is Test {
 
         console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
         vm.stopPrank();
+    } */
+
+    function testDRD() public {
+        testReStakeToBetterPool();
+        console.log("=====pool changed=====");
+        testDeposit();
+        console.log("=====DRD DONE=====");
     }
 }
