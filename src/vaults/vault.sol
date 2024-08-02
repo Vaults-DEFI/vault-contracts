@@ -222,17 +222,20 @@ contract Vault is ERC4626Fees {
     ) internal view virtual override returns (uint256) {
         uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
             .balanceOf(address(this));
-        uint256 totalAssetsInUSDC;
+        uint256 totalAssetsInUSDC = aTokenBalance;
 
-        if (IERC20Metadata(currentStake).decimals() == 6) {
-            // USDC or similar 6-decimal token
-            totalAssetsInUSDC = aTokenBalance;
-        } else if (IERC20Metadata(currentStake).decimals() == 18) {
-            // DAI or similar 18-decimal token
+        if (IERC20Metadata(currentStake).decimals() == 18) {
             totalAssetsInUSDC = aTokenBalance / 10 ** 12;
-        } else {
-            revert("Unsupported asset decimals");
         }
+
+        // if (IERC20Metadata(currentStake).decimals() == 6) {
+        //     // USDC or similar 6-decimal token
+        //     totalAssetsInUSDC = aTokenBalance;
+        // } else if () {
+        //     // DAI or similar 18-decimal token
+        // } else {
+        //     revert("Unsupported asset decimals");
+        // }
 
         return
             assets.mulDiv(
@@ -360,6 +363,12 @@ contract Vault is ERC4626Fees {
             .balanceOf(address(this));
         uint256 totalSupplyShares = totalSupply();
         uint256 shares = _convertToShares(assets, Math.Rounding.Ceil);
+        uint8 currentStakeDecimals = IERC20Metadata(currentStake).decimals();
+
+        if (currentStakeDecimals == 18) {
+            // Convert shares to 6 decimals for comparison with maxShares
+            shares = shares / 1e12;
+        }
         uint256 maxShares = maxRedeem(owner);
         emit sharesDetails(shares, maxShares);
 

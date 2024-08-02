@@ -186,24 +186,44 @@ contract VaultTest is Test {
         // vm.stopPrank();
     }
 
-    /* function testRedeem() public {
+    // function testRedeem() public {
+    //     testDeposit();
+    //     vm.startPrank(USER);
+    //     console.log("gonna go withdraw==============================");
+    //     vault.redeem(amount, USER, USER);
+    //     console.log("withdraw done==============================");
+
+    //     console.log(
+    //         "atoken balance after withdraw",
+    //         IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
+    //     );
+
+    //     console.log("vToken balance after withdraw", vault.balanceOf(USER));
+    //     console.log("USDC balance after withdraw", token.balanceOf(USER));
+    //     vm.stopPrank();
+    // }
+
+    function testWithdraw() public {
         testDeposit();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
-        vault.redeem(amount, USER, USER);
-        console.log("withdraw done==============================");
-
-        console.log(
-            "atoken balance after withdraw",
-            IERC20(vault.getATokenAddress(TOKEN)).balanceOf(address(vault))
+        uint256 assets = IERC20(vault.getATokenAddress(TOKEN2)).balanceOf(
+            address(vault)
         );
 
+        console.log("total assets to withdraw", assets);
+        vault.withdraw(assets, USER, USER);
+        console.log("withdraw done==============================");
+        console.log(
+            "atoken balance after withdraw",
+            IERC20(vault.getATokenAddress(TOKEN2)).balanceOf(address(vault))
+        );
         console.log("vToken balance after withdraw", vault.balanceOf(USER));
-        console.log("USDC balance after withdraw", token.balanceOf(USER));
+        console.log("USDC balance after withdraw", token2.balanceOf(USER));
         vm.stopPrank();
     }
 
-    function testWithdraw() public {
+    function testClassicWithdraw() public {
         testDeposit();
         vm.startPrank(USER);
         console.log("gonna go withdraw==============================");
@@ -214,40 +234,44 @@ contract VaultTest is Test {
         console.log("total assets to withdraw", assets);
         vault.withdraw(assets, USER, USER);
         console.log("withdraw done==============================");
-        console.log("atoken balance after withdraw", assets);
+        console.log(
+            "atoken balance after withdraw",
+            IERC20(vault.getATokenAddress(TOKEN2)).balanceOf(address(vault))
+        );
         console.log("vToken balance after withdraw", vault.balanceOf(USER));
-        console.log("USDC balance after withdraw", token.balanceOf(USER));
+        console.log("USDC balance after withdraw", token2.balanceOf(USER));
         vm.stopPrank();
     }
 
-    function testRedeem2() public {
-        console.log("deposit done from 2");
-        testReStakeToBetterPool();
-        vm.startPrank(USER);
-        console.log("gonna go withdraw==============================");
-        vault.redeem(amount, USER, USER);
-        console.log("withdraw done==============================");
+    // function testRedeem2() public {
+    //     console.log("deposit done from 2");
+    //     testReStakeToBetterPool();
+    //     vm.startPrank(USER);
+    //     console.log("gonna go withdraw==============================");
+    //     vault.redeem(amount, USER, USER);
+    //     console.log("withdraw done==============================");
 
-        console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
-        vm.stopPrank();
-    }
+    //     console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
+    //     vm.stopPrank();
+    // }
 
-    function testWithdraw2() public {
-        console.log("deposit done from 2");
-        testReStakeToBetterPool();
-        vm.startPrank(USER);
-        console.log("gonna go withdraw==============================");
-        vault.redeem(amount, USER, USER);
-        console.log("withdraw done==============================");
+    // function testWithdraw2() public {
+    //     console.log("deposit done from 2");
+    //     testReStakeToBetterPool();
+    //     vm.startPrank(USER);
+    //     console.log("gonna go withdraw==============================");
+    //     vault.redeem(amount, USER, USER);
+    //     console.log("withdraw done==============================");
 
-        console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
-        vm.stopPrank();
-    } */
+    //     console.log("TOKEN2 balance after withdraw", token2.balanceOf(USER));
+    //     vm.stopPrank();
+    // }
 
     function testDRD() public {
         testReStakeToBetterPool();
         console.log("=====pool changed=====");
-        testDeposit();
+        // testDeposit();
+        testWithdraw();
         console.log("=====DRD DONE=====");
     }
 }
