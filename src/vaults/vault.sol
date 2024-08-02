@@ -253,14 +253,41 @@ contract Vault is ERC4626Fees {
         uint256 shares,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
-        return
-            shares.mulDiv(
-                IERC20(getATokenAddress(currentStake)).balanceOf(
-                    address(this)
-                ) + 1,
-                totalSupply() + 10 ** _decimalsOffset(),
-                rounding
-            );
+        uint256 supply = totalSupply();
+        if (supply == 0) {
+            return shares;
+        }
+
+        uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
+            .balanceOf(address(this));
+        uint256 totalAssetsInUSDC = aTokenBalance;
+
+        if (IERC20Metadata(currentStake).decimals() == 18) {
+            totalAssetsInUSDC = aTokenBalance / 10 ** 12;
+        }
+
+        // if (IERC20Metadata(currentStake).decimals() == 6) {
+        //     // USDC or similar 6-decimal token
+        //     totalAssetsInUSDC = aTokenBalance;
+        // } else if (IERC20Metadata(currentStake).decimals() == 18) {
+        //     // DAI or similar 18-decimal token
+        //     totalAssetsInUSDC = aTokenBalance / 10 ** 12;
+        // } else {
+        //     revert("Unsupported asset decimals");
+        // }
+
+        uint256 assetsInUSDC = shares.mulDiv(
+            totalAssetsInUSDC,
+            supply + 10 ** _decimalsOffset(),
+            rounding
+        );
+
+        // If the current stake is an 18-decimal token (like DAI), convert the result back to 18 decimals
+        if (IERC20Metadata(currentStake).decimals() == 18) {
+            return assetsInUSDC * 10 ** 12;
+        }
+
+        return assetsInUSDC;
     }
 
     /*//////////////////////////////////////////////////////////////
