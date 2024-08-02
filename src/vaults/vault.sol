@@ -202,16 +202,42 @@ contract Vault is ERC4626Fees {
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      * function overridden to change the totalAssets()
      */
+    // function _convertToShares(
+    //     uint256 assets,
+    //     Math.Rounding rounding
+    // ) internal view virtual override returns (uint256) {
+    //     return
+    //         assets.mulDiv(
+    //             totalSupply() + 10 ** _decimalsOffset(),
+    //             IERC20(getATokenAddress(currentStake)).balanceOf(
+    //                 address(this)
+    //             ) + 1,
+    //             rounding
+    //         );
+    // }
+
     function _convertToShares(
         uint256 assets,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
+        uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
+            .balanceOf(address(this));
+        uint256 totalAssetsInUSDC;
+
+        if (IERC20Metadata(currentStake).decimals() == 6) {
+            // USDC or similar 6-decimal token
+            totalAssetsInUSDC = aTokenBalance;
+        } else if (IERC20Metadata(currentStake).decimals() == 18) {
+            // DAI or similar 18-decimal token
+            totalAssetsInUSDC = aTokenBalance / 10 ** 12;
+        } else {
+            revert("Unsupported asset decimals");
+        }
+
         return
             assets.mulDiv(
                 totalSupply() + 10 ** _decimalsOffset(),
-                IERC20(getATokenAddress(currentStake)).balanceOf(
-                    address(this)
-                ) + 1,
+                totalAssetsInUSDC + 1,
                 rounding
             );
     }
@@ -441,6 +467,7 @@ contract Vault is ERC4626Fees {
     function afterDeposit(uint256 _amount) internal virtual nonZero(_amount) {
         uint256 amountToAdd = _amount;
         if (currentStake != address(underlyingAsset)) {
+            IERC20(underlyingAsset).approve(address(swapRouter), _amount);
             amountToAdd = swapExactInputSingle(
                 _amount,
                 address(underlyingAsset),
