@@ -54,6 +54,10 @@ contract Vault is ERC4626Fees {
     event beforeAaveDepositEvent(uint256);
     event afterAaveEvent(uint256);
 
+    event sharesLogEvent(uint256);
+    event swapLogEvent(uint256);
+    event reUsableSwapCalled(uint256);
+
     /*//////////////////////////////////////////////////////////////
                           MAPPINGS
     //////////////////////////////////////////////////////////////*/
@@ -199,6 +203,45 @@ contract Vault is ERC4626Fees {
     }
 
     /**
+     * @dev Deposit/mint common workflow.
+     */
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        // If _asset is ERC777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
+        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+        // assets are transferred and before the shares are minted, which is a valid state.
+        // slither-disable-next-line reentrancy-no-eth
+        // SafeERC20.safeTransferFrom(
+        //     underlyingAsset,
+        //     caller,
+        //     address(this),
+        //     assets
+        // );
+        // uint256 amountToAdd;
+        // if (currentStake != address(underlyingAsset)) {
+        //     IERC20(underlyingAsset).approve(address(swapRouter), assets);
+        //     amountToAdd = swapExactInputSingle(
+        //         assets,
+        //         address(underlyingAsset),
+        //         currentStake,
+        //         address(this),
+        //         100
+        //     );
+        // }
+        // shares = previewDeposit(amountToAdd);
+        _mint(receiver, shares);
+
+        emit Deposit(caller, receiver, assets, shares);
+    }
+
+    /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      * function overridden to change the totalAssets()
      */
@@ -222,10 +265,14 @@ contract Vault is ERC4626Fees {
     ) internal view virtual override returns (uint256) {
         uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
             .balanceOf(address(this));
-        uint256 totalAssetsInUSDC = aTokenBalance;
+        // uint256 totalAssetsInUSDC = aTokenBalance;
 
-        if (IERC20Metadata(currentStake).decimals() == 18) {
-            totalAssetsInUSDC = aTokenBalance / 10 ** 12;
+        // if (IERC20Metadata(currentStake).decimals() == 18) {
+        //     totalAssetsInUSDC = aTokenBalance / 10 ** 12;
+        // }
+
+        if (aTokenBalance > 10 ** 12) {
+            aTokenBalance = aTokenBalance / 10 ** 12;
         }
 
         // if (IERC20Metadata(currentStake).decimals() == 6) {
@@ -240,7 +287,7 @@ contract Vault is ERC4626Fees {
         return
             assets.mulDiv(
                 totalSupply() + 10 ** _decimalsOffset(),
-                totalAssetsInUSDC + 1,
+                aTokenBalance + 1,
                 rounding
             );
     }
@@ -260,10 +307,8 @@ contract Vault is ERC4626Fees {
 
         uint256 aTokenBalance = IERC20(getATokenAddress(currentStake))
             .balanceOf(address(this));
-        uint256 totalAssetsInUSDC = aTokenBalance;
-
-        if (IERC20Metadata(currentStake).decimals() == 18) {
-            totalAssetsInUSDC = aTokenBalance / 10 ** 12;
+        if (aTokenBalance > 10 ** 12) {
+            aTokenBalance = aTokenBalance / 10 ** 12;
         }
 
         // if (IERC20Metadata(currentStake).decimals() == 6) {
@@ -277,15 +322,15 @@ contract Vault is ERC4626Fees {
         // }
 
         uint256 assetsInUSDC = shares.mulDiv(
-            totalAssetsInUSDC,
+            aTokenBalance,
             supply + 10 ** _decimalsOffset(),
             rounding
         );
 
         // If the current stake is an 18-decimal token (like DAI), convert the result back to 18 decimals
-        if (IERC20Metadata(currentStake).decimals() == 18) {
-            return assetsInUSDC * 10 ** 12;
-        }
+        // if (IERC20Metadata(currentStake).decimals() == 18) {
+        //     return assetsInUSDC * 10 ** 12;
+        // }
 
         return assetsInUSDC;
     }
@@ -307,12 +352,42 @@ contract Vault is ERC4626Fees {
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
+        // take USDC first
+        SafeERC20.safeTransferFrom(
+            underlyingAsset,
+            msg.sender,
+            address(this),
+            assets
+        );
+        uint256 amountToAdd = assets;
+        if (currentStake != address(underlyingAsset)) {
+            IERC20(underlyingAsset).approve(address(swapRouter), assets);
+            ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+                .ExactInputSingleParams({
+                    tokenIn: address(underlyingAsset),
+                    tokenOut: currentStake,
+                    fee: 100,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: assets,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                });
+
+            amountToAdd = swapRouter.exactInputSingle(params);
+            if (amountToAdd > 10 ** 12) {
+                amountToAdd = amountToAdd / 10 ** 12;
+            }
+        }
+        emit swapLogEvent(amountToAdd);
+
         // uint256 shares = previewDeposit(assets);
-        uint256 shares = previewDeposit(assets);
-        _deposit(_msgSender(), receiver, assets, shares);
+        uint256 shares = previewDeposit(amountToAdd);
+        emit sharesLogEvent(shares);
+        _deposit(_msgSender(), receiver, amountToAdd, shares);
         emit beforeAaveDepositEvent(shares);
-        uint256 fee = _feeOnRaw(assets, _exitFeeBasisPoints());
-        afterDeposit(assets - fee);
+        uint256 fee = _feeOnRaw(amountToAdd, _exitFeeBasisPoints());
+        afterDeposit(amountToAdd - fee);
 
         // overridden
         stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
@@ -332,6 +407,25 @@ contract Vault is ERC4626Fees {
         require(shares <= maxMint(receiver), "ERC4626: mint more than max");
 
         uint256 assets = previewMint(shares);
+
+        // take USDC first
+        SafeERC20.safeTransferFrom(
+            underlyingAsset,
+            msg.sender,
+            address(this),
+            assets
+        );
+        uint256 amountToAdd;
+        if (currentStake != address(underlyingAsset)) {
+            IERC20(underlyingAsset).approve(address(swapRouter), assets);
+            amountToAdd = swapExactInputSingle(
+                assets,
+                address(underlyingAsset),
+                currentStake,
+                address(this),
+                100
+            );
+        }
         _deposit(_msgSender(), receiver, assets, shares);
         afterDeposit(assets);
         stakeTimeEpochMapping[msg.sender] = uint32(block.timestamp);
@@ -494,6 +588,7 @@ contract Vault is ERC4626Fees {
             });
 
         amountOut = swapRouter.exactInputSingle(params);
+        emit reUsableSwapCalled(amountOut);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -501,25 +596,20 @@ contract Vault is ERC4626Fees {
     //////////////////////////////////////////////////////////////*/
 
     function afterDeposit(uint256 _amount) internal virtual nonZero(_amount) {
-        uint256 amountToAdd = _amount;
-        if (currentStake != address(underlyingAsset)) {
-            IERC20(underlyingAsset).approve(address(swapRouter), _amount);
-            amountToAdd = swapExactInputSingle(
-                _amount,
-                address(underlyingAsset),
-                currentStake,
-                address(this),
-                100
-            );
-        }
-        IERC20(currentStake).approve(address(lendingPool), amountToAdd);
-        lendingPool.deposit(
-            currentStake,
-            amountToAdd,
-            address(this),
-            referralCode
-        );
-        emit movedToAaveEvent(currentStake, amountToAdd);
+        // uint256 amountToAdd = _amount;
+        // if (currentStake != address(underlyingAsset)) {
+        //     IERC20(underlyingAsset).approve(address(swapRouter), _amount);
+        //     amountToAdd = swapExactInputSingle(
+        //         _amount,
+        //         address(underlyingAsset),
+        //         currentStake,
+        //         address(this),
+        //         100
+        //     );
+        // }
+        IERC20(currentStake).approve(address(lendingPool), _amount);
+        lendingPool.deposit(currentStake, _amount, address(this), referralCode);
+        emit movedToAaveEvent(currentStake, _amount);
     }
 
     function beforeWithdraw(
