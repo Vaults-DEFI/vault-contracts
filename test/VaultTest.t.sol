@@ -41,6 +41,15 @@ contract VaultTest is Test {
         amount = 100000000;
         amount2 = 100000000;
         amount3 = 100000000;
+
+        uint256 currentLiquidityRate = vault.getATokenAddressData(TOKEN);
+        console.log("here comes the data:::::::", currentLiquidityRate);
+        // Convert Ray to WAD (1e27 to 1e18)
+        uint256 rateInWad = currentLiquidityRate / 1e9;
+
+        // Convert WAD to percentage
+        uint256 apyPercentage = (rateInWad / 1e18);
+        console.log("APY PERCENTAGE:::::", apyPercentage);
         console.log("== Setup completed. ==");
     }
 

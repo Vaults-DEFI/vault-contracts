@@ -104,6 +104,15 @@ contract Vault is ERC4626Fees {
         return reserveData.aTokenAddress;
     }
 
+    function getATokenAddressData(
+        address _asset
+    ) public view returns (uint256) {
+        IPool.ReserveData memory reserveData = lendingPool.getReserveData(
+            _asset
+        );
+        return reserveData.currentVariableBorrowRate;
+    }
+
     /*//////////////////////////////////////////////////////////////
                           STRATEGY CALLS (ONLY OWNER)
     //////////////////////////////////////////////////////////////*/
